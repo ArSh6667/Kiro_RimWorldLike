@@ -1,0 +1,9 @@
+global using NUnit.Framework;
+global using FsCheck;
+global using FsCheck.NUnit;
+global using RimWorldFramework.Core;
+global using RimWorldFramework.Core.ECS;
+global using RimWorldFramework.Core.Systems;
+global using RimWorldFramework.Core.Configuration;
+global using RimWorldFramework.Core.Events;
+global using RimWorldFramework.Core.Common;
