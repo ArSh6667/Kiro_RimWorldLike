@@ -4,6 +4,13 @@ using RimWorldFramework.Core.Configuration;
 using RimWorldFramework.Core.Events;
 using RimWorldFramework.Core.Systems;
 using RimWorldFramework.Core.ECS;
+using RimWorldFramework.Core.Characters;
+using RimWorldFramework.Core.Tasks;
+using RimWorldFramework.Core.Pathfinding;
+using RimWorldFramework.Core.MapGeneration;
+using RimWorldFramework.Core.Serialization;
+using RimWorldFramework.Core.Mods;
+using RimWorldFramework.Core.Performance;
 
 namespace RimWorldFramework.Core
 {
@@ -252,9 +259,46 @@ namespace RimWorldFramework.Core
         /// </summary>
         private void RegisterCoreSystems()
         {
-            // 这里可以注册框架的核心系统
-            // 例如：渲染系统、输入系统、物理系统等
-            _logger.LogDebug("Core systems registered");
+            // 注册所有核心系统
+            try
+            {
+                // ECS核心系统
+                RegisterSystem(new ComponentSystem());
+                
+                // 角色系统
+                RegisterSystem(new CharacterSystem(_entityManager, _eventBus, _logger as ILogger<CharacterSystem>));
+                RegisterSystem(new StateUpdateSystem(_entityManager, _eventBus, _logger as ILogger<StateUpdateSystem>));
+                
+                // 任务系统
+                RegisterSystem(new TaskManager(_entityManager, _eventBus, _logger as ILogger<TaskManager>));
+                RegisterSystem(new CollaborationManager(_entityManager, _eventBus, _logger as ILogger<CollaborationManager>));
+                
+                // 路径寻找系统
+                RegisterSystem(new PathfindingSystem(_entityManager, _eventBus, _logger as ILogger<PathfindingSystem>));
+                
+                // 地图生成系统
+                RegisterSystem(new MapGenerationSystem(_eventBus, _logger as ILogger<MapGenerationSystem>));
+                
+                // 序列化系统
+                RegisterSystem(new SerializationSystem(_entityManager, _eventBus, _logger as ILogger<SerializationSystem>));
+                
+                // 模组系统
+                RegisterSystem(new ModManager(_eventBus, _logger as ILogger<ModManager>));
+                
+                // 性能管理系统
+                RegisterSystem(new ResourceManager(_logger as ILogger<ResourceManager>));
+                RegisterSystem(new PerformanceMonitor(_eventBus, _logger as ILogger<PerformanceMonitor>));
+                
+                // 游戏进度系统
+                RegisterSystem(new GameProgressSystem(_entityManager, _eventBus, _logger as ILogger<GameProgressSystem>));
+                
+                _logger.LogInformation("All core systems registered successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to register core systems");
+                throw;
+            }
         }
 
         /// <summary>
