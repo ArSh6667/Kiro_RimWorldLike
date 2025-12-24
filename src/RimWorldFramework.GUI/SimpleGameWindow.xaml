@@ -1,0 +1,60 @@
+<Window x:Class="RimWorldFramework.GUI.SimpleGameWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="RimWorld 游戏 - 演示" 
+        Height="500" 
+        Width="700"
+        WindowStartupLocation="CenterScreen">
+    
+    <Grid Background="#FF1A202C">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- 标题栏 -->
+        <Border Grid.Row="0" Background="#FF2D3748" Padding="10">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="🎮 RimWorld 游戏框架演示" 
+                           FontSize="16" 
+                           Foreground="White" 
+                           VerticalAlignment="Center"/>
+                <Button Name="BackButton" 
+                        Content="返回主菜单" 
+                        Margin="20,0,0,0"
+                        Padding="10,5"
+                        Click="BackButton_Click"/>
+            </StackPanel>
+        </Border>
+        
+        <!-- 游戏内容 -->
+        <ScrollViewer Grid.Row="1" Margin="10">
+            <TextBlock Name="GameOutput" 
+                       Foreground="White" 
+                       FontFamily="Consolas" 
+                       FontSize="12"
+                       TextWrapping="Wrap"/>
+        </ScrollViewer>
+        
+        <!-- 控制按钮 -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="10">
+            <Button Name="StartDemoButton" 
+                    Content="启动演示" 
+                    Margin="5"
+                    Padding="10,5"
+                    Click="StartDemoButton_Click"/>
+            <Button Name="StopDemoButton" 
+                    Content="停止演示" 
+                    Margin="5"
+                    Padding="10,5"
+                    IsEnabled="False"
+                    Click="StopDemoButton_Click"/>
+            <Button Name="ClearButton" 
+                    Content="清空输出" 
+                    Margin="5"
+                    Padding="10,5"
+                    Click="ClearButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

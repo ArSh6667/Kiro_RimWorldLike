@@ -1,0 +1,70 @@
+<Window x:Class="RimWorldFramework.GUI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="RimWorld 游戏框架" 
+        Height="600" 
+        Width="800"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanMinimize">
+    
+    <Grid>
+        <!-- 背景渐变 -->
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#FF2D3748" Offset="0"/>
+                <GradientStop Color="#FF4A5568" Offset="1"/>
+            </LinearGradientBrush>
+        </Grid.Background>
+        
+        <!-- 主要内容区域 -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- 标题区域 -->
+        <StackPanel Grid.Row="0" Margin="20,40,20,20">
+            <TextBlock Text="RimWorld 游戏框架" 
+                       FontSize="36" 
+                       FontWeight="Bold" 
+                       Foreground="White" 
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,10"/>
+            <TextBlock Text="基于ECS架构的游戏开发框架" 
+                       FontSize="16" 
+                       Foreground="#FFCBD5E0" 
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+        
+        <!-- 按钮区域 -->
+        <StackPanel Grid.Row="1" 
+                    VerticalAlignment="Center" 
+                    HorizontalAlignment="Center">
+            
+            <Button Name="StartGameButton" 
+                    Content="🎮 开始游戏" 
+                    Style="{StaticResource GameButton}"
+                    Click="StartGameButton_Click"/>
+            
+            <Button Name="ExitGameButton" 
+                    Content="❌ 结束游戏" 
+                    Style="{StaticResource GameButton}"
+                    Click="ExitGameButton_Click"/>
+            
+        </StackPanel>
+        
+        <!-- 状态栏 -->
+        <StackPanel Grid.Row="2" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Center" 
+                    Margin="20">
+            <TextBlock Text="版本: 1.0.0" 
+                       Foreground="#FFCBD5E0" 
+                       Margin="0,0,20,0"/>
+            <TextBlock Text="状态: 就绪" 
+                       Name="StatusText"
+                       Foreground="#FFCBD5E0"/>
+        </StackPanel>
+    </Grid>
+</Window>
