@@ -23,15 +23,15 @@ if %errorlevel% neq 0 (
     echo ❌ 错误: 未找到 .NET SDK
     echo.
     echo 🔧 解决方案:
-    echo 1. 运行安装助手: setup-dotnet.bat
+    echo 1. 运行安装助手: update-Log\setup-dotnet.bat
     echo 2. 或手动下载: https://dotnet.microsoft.com/download/dotnet/8.0
     echo 3. 安装后重启命令提示符，再次运行此脚本
     echo.
-    echo 📖 查看完整安装指南: README-SETUP.md
+    echo 📖 查看完整安装指南: update-Log\README-SETUP.md
     echo.
     set /p install_choice="是否现在打开安装助手? (y/n): "
     if /i "%install_choice%"=="y" (
-        call setup-dotnet.bat
+        call update-Log\setup-dotnet.bat
     )
     goto :error_exit
 )
@@ -97,17 +97,17 @@ echo ===============================================
 echo 启动失败！解决方案:
 echo.
 echo 🔧 立即解决:
-echo 1. setup-dotnet.bat     (安装 .NET SDK)
-echo 2. debug-gui.bat        (运行完整诊断)
-echo 3. README-SETUP.md      (查看安装指南)
+echo 1. update-Log\setup-dotnet.bat     (安装 .NET SDK)
+echo 2. update-Log\debug-gui.bat        (运行完整诊断)
+echo 3. update-Log\README-SETUP.md      (查看安装指南)
 echo.
 echo 🎮 备用启动方式:
 echo • run-console-demo.bat  (控制台版本，如果可用)
 echo • 查看项目文档和截图
 echo.
 echo 📚 文档:
-echo • README-GameWorld.md   (游戏世界说明)
-echo • TROUBLESHOOTING.md    (完整故障排除)
+echo • update-Log\README-GameWorld.md   (游戏世界说明)
+echo • update-Log\TROUBLESHOOTING.md    (完整故障排除)
 echo ===============================================
 echo.
 echo 按任意键退出...

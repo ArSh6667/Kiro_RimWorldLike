@@ -7,7 +7,7 @@ using System.Windows.Threading;
 namespace RimWorldFramework.GUI
 {
     /// <summary>
-    /// GameWorldWindow.xaml 的交互逻辑
+    /// GameWorldWindow.xaml 的交互逻辑 - 重构版本
     /// </summary>
     public partial class GameWorldWindow : Window
     {
@@ -15,24 +15,23 @@ namespace RimWorldFramework.GUI
         private const int MAP_SIZE = 256;           // 地图格子数量 256x256
         private const int TILE_SIZE = 32;           // 每格像素大小 32x32
         private const int WORLD_SIZE = MAP_SIZE * TILE_SIZE; // 总像素大小 8192x8192
+        private const int CANVAS_SIZE = 16384;      // Canvas尺寸 (2倍世界大小，防止缩放黑幕)
+
+        // 控制器
+        private CameraController? _cameraController;
+        private CharacterController? _characterController;
 
         // 游戏状态
-        private DispatcherTimer _gameTimer;
-        private DispatcherTimer _fpsTimer;
+        private DispatcherTimer _fpsTimer = null!;
         private DateTime _gameStartTime;
-        private bool _isGameRunning = false;
-        private bool _followCharacter = false;
         private int _frameCount = 0;
-        private DateTime _lastFpsUpdate = DateTime.Now;
 
         // 地图数据
-        private Rectangle[,] _mapTiles;
-        private float[,] _noiseMap;
+        private Rectangle[,] _mapTiles = null!;
+        private float[,] _noiseMap = null!;
 
-        // 人物
-        private Ellipse _character;
-        private Point _characterPosition;
-        private Random _random;
+        // ESC菜单状态
+        private bool _isEscMenuVisible = false;
 
         // 地形颜色
         private readonly Brush[] _terrainColors = new Brush[]
@@ -46,20 +45,34 @@ namespace RimWorldFramework.GUI
         public GameWorldWindow()
         {
             InitializeComponent();
-            _random = new Random();
+            InitializeControllers();
             InitializeGame();
+        }
+
+        private void InitializeControllers()
+        {
+            // 初始化相机控制器
+            _cameraController = new CameraController(MapScrollViewer, MapScaleTransform);
+            _cameraController.ZoomChanged += OnZoomChanged;
+            _cameraController.FollowModeChanged += OnFollowModeChanged;
+
+            // 初始化人物控制器
+            _characterController = new CharacterController(GameCanvas);
+            _characterController.CharacterMoved += OnCharacterMoved;
+            _characterController.CharacterPositionChanged += OnCharacterPositionChanged;
+
+            // 添加键盘事件支持
+            this.KeyDown += GameWorldWindow_KeyDown;
+            this.KeyUp += GameWorldWindow_KeyUp;
+            this.Focusable = true;
+            this.Focus();
         }
 
         private void InitializeGame()
         {
             _gameStartTime = DateTime.Now;
-            _characterPosition = new Point(MAP_SIZE / 2, MAP_SIZE / 2); // 起始位置在地图中心
 
-            // 初始化定时器
-            _gameTimer = new DispatcherTimer();
-            _gameTimer.Interval = TimeSpan.FromMilliseconds(100); // 10 FPS 游戏逻辑
-            _gameTimer.Tick += GameTimer_Tick;
-
+            // 初始化FPS定时器
             _fpsTimer = new DispatcherTimer();
             _fpsTimer.Interval = TimeSpan.FromSeconds(1);
             _fpsTimer.Tick += FpsTimer_Tick;
@@ -67,12 +80,12 @@ namespace RimWorldFramework.GUI
 
             // 生成地图
             GenerateMap();
-            
+
             // 创建人物
-            CreateCharacter();
-            
+            _characterController?.CreateCharacter();
+
             // 居中视图
-            CenterView();
+            _cameraController?.CenterView();
 
             UpdateUI();
         }
@@ -80,16 +93,20 @@ namespace RimWorldFramework.GUI
         private void GenerateMap()
         {
             StatusText.Text = "状态: 正在生成地图...";
-            
+
             // 生成噪声地图
             _noiseMap = GenerateNoiseMap(MAP_SIZE, MAP_SIZE);
-            
+
             // 初始化地图瓦片数组
             _mapTiles = new Rectangle[MAP_SIZE, MAP_SIZE];
-            
+
             // 清空画布
             GameCanvas.Children.Clear();
-            
+
+            // 计算地图在Canvas中的偏移量（居中显示）
+            var mapOffsetX = (CANVAS_SIZE - WORLD_SIZE) / 2;
+            var mapOffsetY = (CANVAS_SIZE - WORLD_SIZE) / 2;
+
             // 生成地图瓦片
             for (int x = 0; x < MAP_SIZE; x++)
             {
@@ -102,15 +119,15 @@ namespace RimWorldFramework.GUI
                         Fill = GetTerrainColor(_noiseMap[x, y]),
                         Stroke = null // 不显示边框以提高性能
                     };
-                    
-                    Canvas.SetLeft(tile, x * TILE_SIZE);
-                    Canvas.SetTop(tile, y * TILE_SIZE);
-                    
+
+                    Canvas.SetLeft(tile, mapOffsetX + x * TILE_SIZE);
+                    Canvas.SetTop(tile, mapOffsetY + y * TILE_SIZE);
+
                     GameCanvas.Children.Add(tile);
                     _mapTiles[x, y] = tile;
                 }
             }
-            
+
             StatusText.Text = "状态: 地图生成完成";
         }
 
@@ -118,7 +135,7 @@ namespace RimWorldFramework.GUI
         {
             var noiseMap = new float[width, height];
             var random = new Random();
-            
+
             // 简单的柏林噪声实现
             for (int x = 0; x < width; x++)
             {
@@ -127,28 +144,28 @@ namespace RimWorldFramework.GUI
                     float noise = 0f;
                     float amplitude = 1f;
                     float frequency = 0.01f;
-                    
+
                     // 多层噪声
                     for (int octave = 0; octave < 4; octave++)
                     {
                         float sampleX = x * frequency;
                         float sampleY = y * frequency;
-                        
+
                         // 简化的噪声函数
-                        float noiseValue = (float)(Math.Sin(sampleX) * Math.Cos(sampleY) + 
+                        float noiseValue = (float)(Math.Sin(sampleX) * Math.Cos(sampleY) +
                                                   Math.Sin(sampleX * 2) * Math.Cos(sampleY * 2) * 0.5f +
                                                   random.NextDouble() * 0.1f);
-                        
+
                         noise += noiseValue * amplitude;
                         amplitude *= 0.5f;
                         frequency *= 2f;
                     }
-                    
+
                     // 标准化到 0-1 范围
                     noiseMap[x, y] = (noise + 1f) / 2f;
                 }
             }
-            
+
             return noiseMap;
         }
 
@@ -165,79 +182,6 @@ namespace RimWorldFramework.GUI
                 return _terrainColors[3]; // 白色 - 雪地/高山
         }
 
-        private void CreateCharacter()
-        {
-            _character = new Ellipse
-            {
-                Width = 16,
-                Height = 16,
-                Fill = Brushes.Red,
-                Stroke = Brushes.DarkRed,
-                StrokeThickness = 2
-            };
-            
-            UpdateCharacterPosition();
-            GameCanvas.Children.Add(_character);
-        }
-
-        private void UpdateCharacterPosition()
-        {
-            double pixelX = _characterPosition.X * TILE_SIZE + TILE_SIZE / 2 - _character.Width / 2;
-            double pixelY = _characterPosition.Y * TILE_SIZE + TILE_SIZE / 2 - _character.Height / 2;
-            
-            Canvas.SetLeft(_character, pixelX);
-            Canvas.SetTop(_character, pixelY);
-        }
-
-        private void MoveCharacterRandomly()
-        {
-            // 随机选择移动方向
-            var directions = new Point[]
-            {
-                new Point(0, -1),  // 上
-                new Point(1, 0),   // 右
-                new Point(0, 1),   // 下
-                new Point(-1, 0),  // 左
-                new Point(1, -1),  // 右上
-                new Point(1, 1),   // 右下
-                new Point(-1, 1),  // 左下
-                new Point(-1, -1), // 左上
-                new Point(0, 0)    // 停留
-            };
-            
-            var direction = directions[_random.Next(directions.Length)];
-            var newX = _characterPosition.X + direction.X;
-            var newY = _characterPosition.Y + direction.Y;
-            
-            // 边界检查
-            if (newX >= 0 && newX < MAP_SIZE && newY >= 0 && newY < MAP_SIZE)
-            {
-                _characterPosition.X = newX;
-                _characterPosition.Y = newY;
-                UpdateCharacterPosition();
-                
-                // 如果启用跟随模式，移动视图
-                if (_followCharacter)
-                {
-                    FollowCharacter();
-                }
-            }
-        }
-
-        private void GameTimer_Tick(object? sender, EventArgs e)
-        {
-            if (!_isGameRunning) return;
-            
-            // 移动人物
-            MoveCharacterRandomly();
-            
-            // 更新UI
-            UpdateUI();
-            
-            // 计算FPS
-            _frameCount++;
-        }
-
         private void FpsTimer_Tick(object? sender, EventArgs e)
         {
             FpsText.Text = $"FPS: {_frameCount}";
@@ -248,95 +192,188 @@ namespace RimWorldFramework.GUI
         {
             var elapsed = DateTime.Now - _gameStartTime;
             TimeText.Text = $"游戏时间: {elapsed:hh\\:mm\\:ss}";
-            
-            CharacterInfoText.Text = $"数量: 1个\n位置: ({(int)_characterPosition.X}, {(int)_characterPosition.Y})\n状态: {(_isGameRunning ? "随机移动" : "静止")}";
+
+            if (_characterController != null)
+            {
+                var (position, status) = _characterController.GetCharacterInfo();
+                CharacterInfoText.Text = $"数量: 1个\n位置: ({(int)position.X}, {(int)position.Y})\n状态: {status}";
+            }
+
+            // 更新相机信息
+            UpdateCameraInfo();
         }
 
-        private void CenterView()
+        private void UpdateCameraInfo()
         {
-            // 将视图居中到地图中心
-            var centerX = WORLD_SIZE / 2 - MapScrollViewer.ViewportWidth / 2;
-            var centerY = WORLD_SIZE / 2 - MapScrollViewer.ViewportHeight / 2;
-            
-            MapScrollViewer.ScrollToHorizontalOffset(Math.Max(0, centerX));
-            MapScrollViewer.ScrollToVerticalOffset(Math.Max(0, centerY));
+            if (_cameraController != null)
+            {
+                var (x, y, zoom, following) = _cameraController.GetCameraInfo();
+                var runningStatus = _characterController?.IsGameRunning == true ? "运行中" : "暂停";
+                StatusText.Text = $"状态: {runningStatus} | 缩放: {zoom:F1}x | 视角: ({x}, {y}) | 跟随: {(following ? "开" : "关")}";
+            }
         }
 
-        private void FollowCharacter()
+        // 控制器事件处理
+        private void OnZoomChanged(double newZoom)
         {
-            // 将视图跟随人物
-            var characterPixelX = _characterPosition.X * TILE_SIZE;
-            var characterPixelY = _characterPosition.Y * TILE_SIZE;
-            
-            var targetX = characterPixelX - MapScrollViewer.ViewportWidth / 2;
-            var targetY = characterPixelY - MapScrollViewer.ViewportHeight / 2;
-            
-            MapScrollViewer.ScrollToHorizontalOffset(Math.Max(0, targetX));
-            MapScrollViewer.ScrollToVerticalOffset(Math.Max(0, targetY));
+            UpdateCameraInfo();
+            _frameCount++;
         }
 
-        // 事件处理器
+        private void OnFollowModeChanged()
+        {
+            UpdateCameraInfo();
+            UpdateFollowButtonText();
+        }
+
+        private void OnCharacterMoved(Point position)
+        {
+            // 如果启用跟随模式，移动相机
+            if (_cameraController?.FollowCharacter == true)
+            {
+                _cameraController.FollowPosition(position);
+            }
+            UpdateUI();
+        }
+
+        private void OnCharacterPositionChanged(Point position)
+        {
+            // 实时位置更新（用于平滑跟随）
+            _frameCount++;
+        }
+
+        private void UpdateFollowButtonText()
+        {
+            if (_cameraController != null)
+            {
+                FollowCharacterButton.Content = _cameraController.FollowCharacter ? "🔓 取消跟随" : "👤 跟随人物";
+            }
+        }
+
+        // 键盘事件处理
+        private void GameWorldWindow_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            // ESC键优先处理，无论相机控制是否启用
+            if (e.Key == System.Windows.Input.Key.Escape)
+            {
+                ToggleEscMenu();
+                e.Handled = true;
+                return;
+            }
+
+            if (!_isEscMenuVisible)
+            {
+                _cameraController?.HandleKeyDown(e.Key);
+                e.Handled = true;
+            }
+        }
+
+        private void GameWorldWindow_KeyUp(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (!_isEscMenuVisible)
+            {
+                _cameraController?.HandleKeyUp(e.Key);
+            }
+        }
+
+        private void ToggleEscMenu()
+        {
+            _isEscMenuVisible = !_isEscMenuVisible;
+            EscMenuPanel.Visibility = _isEscMenuVisible ? Visibility.Visible : Visibility.Collapsed;
+
+            // 当显示菜单时，清空按键状态以停止移动
+            if (_isEscMenuVisible)
+            {
+                _cameraController?.ClearKeyState();
+            }
+
+            // 禁用/启用相机控制
+            if (_cameraController != null)
+            {
+                _cameraController.CameraControlEnabled = !_isEscMenuVisible;
+            }
+        }
+
+        // 按钮事件处理器
         private void BackButton_Click(object sender, RoutedEventArgs e)
         {
-            _gameTimer?.Stop();
+            _cameraController?.Stop();
+            _characterController?.Stop();
             _fpsTimer?.Stop();
             this.Close();
         }
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
-            _isGameRunning = true;
-            _gameTimer.Start();
-            StartButton.IsEnabled = false;
-            PauseButton.IsEnabled = true;
-            StatusText.Text = "状态: 游戏运行中";
+            if (_characterController != null)
+            {
+                _characterController.IsGameRunning = true;
+                StartButton.IsEnabled = false;
+                PauseButton.IsEnabled = true;
+                StatusText.Text = "状态: 游戏运行中";
+            }
         }
 
         private void PauseButton_Click(object sender, RoutedEventArgs e)
         {
-            _isGameRunning = false;
-            _gameTimer.Stop();
-            StartButton.IsEnabled = true;
-            PauseButton.IsEnabled = false;
-            StatusText.Text = "状态: 游戏已暂停";
+            if (_characterController != null)
+            {
+                _characterController.IsGameRunning = false;
+                StartButton.IsEnabled = true;
+                PauseButton.IsEnabled = false;
+                StatusText.Text = "状态: 游戏已暂停";
+            }
         }
 
         private void ResetButton_Click(object sender, RoutedEventArgs e)
         {
-            _isGameRunning = false;
-            _gameTimer.Stop();
-            StartButton.IsEnabled = true;
-            PauseButton.IsEnabled = false;
-            
-            // 重新生成地图和重置人物位置
-            _characterPosition = new Point(MAP_SIZE / 2, MAP_SIZE / 2);
-            GenerateMap();
-            CreateCharacter();
-            CenterView();
-            
-            StatusText.Text = "状态: 游戏已重置";
+            if (_characterController != null)
+            {
+                _characterController.IsGameRunning = false;
+                StartButton.IsEnabled = true;
+                PauseButton.IsEnabled = false;
+
+                // 重新生成地图和重置人物位置
+                _characterController.ResetCharacterPosition();
+                GenerateMap();
+                _characterController.CreateCharacter();
+                _cameraController?.CenterView();
+
+                StatusText.Text = "状态: 游戏已重置";
+            }
         }
 
         private void CenterViewButton_Click(object sender, RoutedEventArgs e)
         {
-            _followCharacter = false;
-            CenterView();
+            if (_cameraController != null)
+            {
+                _cameraController.FollowCharacter = false;
+                _cameraController.CenterView();
+            }
         }
 
         private void FollowCharacterButton_Click(object sender, RoutedEventArgs e)
         {
-            _followCharacter = !_followCharacter;
-            FollowCharacterButton.Content = _followCharacter ? "🔓 取消跟随" : "👤 跟随人物";
-            
-            if (_followCharacter)
+            if (_cameraController != null)
             {
-                FollowCharacter();
+                _cameraController.FollowCharacter = !_cameraController.FollowCharacter;
+
+                if (_cameraController.FollowCharacter && _characterController != null)
+                {
+                    _cameraController.FollowPosition(_characterController.CharacterPosition);
+                }
             }
+        }
+
+        private void ExitFullscreenButton_Click(object sender, RoutedEventArgs e)
+        {
+            this.Close();
         }
 
         protected override void OnClosed(EventArgs e)
         {
-            _gameTimer?.Stop();
+            _cameraController?.Stop();
+            _characterController?.Stop();
             _fpsTimer?.Stop();
             base.OnClosed(e);
         }

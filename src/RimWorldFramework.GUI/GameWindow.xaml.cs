@@ -10,7 +10,7 @@ namespace RimWorldFramework.GUI
     /// </summary>
     public partial class GameWindow : Window
     {
-        private DispatcherTimer _gameTimer;
+        private DispatcherTimer _gameTimer = null!;
         private DateTime _gameStartTime;
         private Process? _demoProcess;
         private bool _isDemoRunning = false;
